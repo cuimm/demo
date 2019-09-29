@@ -32,20 +32,22 @@ function resolvePromise(promise2, x, resolve, reject) {
       let then = x.then
       if (typeof then === 'function') {
         // 这里只能认为x是一个promise了
-        then.call(x, (y) => {
+        then.call(x, y => {
           if (called) return
           called = true
           // resolve(x)
           resolvePromise(promise2, y, resolve, reject)
         }, (r) => {
+          if (called) return
+          called = true
           reject(r)
         })
       } else { // 对象 普通值
-        if (called) return
-        called = true
         resolve(x)
       }
     } catch (e) {
+      if (called) return
+      called = true
       reject(e)
     }
   } else {
@@ -82,6 +84,11 @@ class MyPromise {
   }
 
   then(onFulfilled, onRejected) {
+    // then中没有提供成功或者失败的调用，则会把上一次的参数透传
+    onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : val => val
+    onRejected = typeof onRejected === 'function' ? onRejected : error => {
+      throw error
+    }
     const promise2 = new MyPromise((resolve, reject) => {
       if (this.status === PROMISE_STATUS.FULFILLED) {
         setTimeout(() => {
@@ -134,14 +141,16 @@ class MyPromise {
 }
 
 // 必须测试前 要加这一段代码
-// Promise.defer = Promise.deferred = function() {
-//   let dfd = {};
-//   dfd.promise = new Promise((resolve, reject) => {
-//     dfd.resolve = resolve;
-//     dfd.reject = reject;
-//   });
-//   return dfd;
-// };
+// sudo npm install promises-aplus-tests -g 这个是帮我们测试的包
+// promises-aplus-tests 1.promise.js
+MyPromise.defer = MyPromise.deferred = function() {
+  let dfd = {};
+  dfd.promise = new MyPromise((resolve, reject) => {
+    dfd.resolve = resolve;
+    dfd.reject = reject;
+  });
+  return dfd;
+};
 
 /*
 const PROMISE_STATUS = {
